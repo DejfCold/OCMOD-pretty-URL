@@ -7,13 +7,14 @@
 	<link>https://dejfcold.cz</link>
 	<file path="admin/controller/catalog/product.php">
 		<operation error="skip">
-		<search><![CDATA[if (count(array_keys($language, $keyword)) > 1) {]]></search>
-		<add position="replace">if (false) {</add>
+			<search><![CDATA[if (count(array_keys($language, $keyword)) > 1) {]]></search>
+			<add position="replace"><![CDATA[if (false) {]]></add>
+		</operation>
 	</file>
 	<file path="catalog/controller/startup/seo_url.php">
 		<operation error="skip">
-		<search><![CDATA[public function index() {]]></search>
-		<add position="replace"><![CDATA[public function index() {
+			<search><![CDATA[public function index() {]]></search>
+			<add position="replace"><![CDATA[public function index() {
 		// Add rewrite to url class
 		if ($this->config->get('config_seo_url')) {
 			$this->url->addRewrite($this);
