@@ -2,7 +2,7 @@
 <modification>
 	<name>Autogenerate friendly url</name>
 	<code>autogenerate_friendly_url</code>
-	<version>1.0.0</version>
+	<version>1.1.0</version>
 	<author>David Studený</author>
 	<link>https://dejfcold.cz</link>
     <file path="catalog/controller/startup/seo_url.php">
