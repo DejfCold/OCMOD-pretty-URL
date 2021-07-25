@@ -9,7 +9,6 @@
 		<operation error="skip">
 			<search><![CDATA[public function index() {]]></search>
             <add position="replace"><![CDATA[public function index() {
-
 		// Add rewrite to url class
 		if ($this->config->get('config_seo_url')) {
 			$this->url->addRewrite($this);
@@ -23,13 +22,13 @@
 			if (utf8_strlen(end($parts)) == 0) {
 				array_pop($parts);
 			}
-
             if(count($parts) == 1) {
                 $part = $parts[0];
                 $isProduct = $this->extractProduct($part);
                 if($isProduct) {
                     return;
                 }
+
 
                 $isInformation = $this->extractInformation($part);
                 if($isInformation) {
@@ -42,9 +41,11 @@
                 }
             }
 
-            if($this->extractProduct($parts[count($parts)-1])) {
-return;
-}
+            $isProduct = $this->extractProduct($parts[count($parts)-1]);
+            if($isProduct) {
+                return;
+            }
+
             $isCategory = $this->extractCategory($parts);
             if($isCategory) {
                 return;
@@ -54,18 +55,16 @@ return;
     }
 
     public function extractProduct($urlPart) {
-
         $id_name = explode('-', $urlPart, 2);
         $url_id = $id_name[0];
-        $url_name = $this->transformName($id_name[1]);
-
-if(!is_numeric($url_id)) {
-  return false;
-}
+        $url_name = $this->unescapeText($id_name[0]);
+        if(!is_numeric($url_id)) {
+            return false;
+        }
         $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product WHERE product_id = " . $this->db->escape($url_id) . ';');
         if ($query->num_rows) {
             $prod_id = $query->row['product_id'];
-            $prod_name = $this->transformName($query->row['model']);
+            $prod_name = $query->row['model'];
             if($url_name == $prod_name && $url_id == $prod_id) {
                 $this->request->get['product_id'] = $prod_id;
                 $this->request->get['route'] = 'product/product';
@@ -80,8 +79,7 @@ if(!is_numeric($url_id)) {
         $parentId = 0;
         $path = "";
         foreach($urlParts as $part) {
-
-            $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "category a, " . DB_PREFIX . "category_description b WHERE b.name = '" . $this->db->escape($part) . "' AND a.category_id = b.category_id AND a.parent_id = " . $parentId . " AND a.status = 1;");
+            $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "category a, " . DB_PREFIX . "category_description b WHERE b.name = '" . $this->db->escape($this->unescapeText($part)) . "' AND a.category_id = b.category_id AND parent_id = " . $this->db->escape($parentId) . " AND status = 1;");
             if ($query->num_rows) {
                 $parentId = $query->row['category_id'];
                 if($path == "") {
@@ -89,7 +87,6 @@ if(!is_numeric($url_id)) {
                 } else {
                     $path .= '_' . $parentId;
                 }
-
             }
         }
         if($parentId != 0) {
@@ -112,6 +109,7 @@ if(!is_numeric($url_id)) {
     }
 
     public function extractManufacturer($urlPart) {
+
         $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "manufacturer WHERE name = '" . $this->db->escape($urlPart) . "';");
         if ($query->num_rows) {
             $this->request->get['manufacturer_id'] = $query->row['manufacturer_id'];
@@ -139,10 +137,10 @@ if(!is_numeric($url_id)) {
                 if($data['route'] == 'product/product' && $key == 'product_id') {
                     $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product WHERE product_id = " . $this->db->escape($value) . ";");
                     if ($query->num_rows) {
-                        $url .= "/" . $query->row['product_id'] . "-" . $this->transformName($query->row['model']);
+                        $url .= "/" . $query->row['product_id'] . "-" . $this->escapeText($query->row['model']);
                         unset($data[$key]);
                     }
-                } elseif ($data['route'] == 'product/manufacturer/info' && $key == 'manufacturer_id') {
+                } elseif ($data['route'] == 'product/manufacturer/info' && $key == 'manufacturer_id' && $value != "") {
                     $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "manufacturer WHERE manufacturer_id = " . $this->db->escape($value) . ";");
                     if ($query->num_rows) {
                         $url .= "/" . $query->row['name'];
@@ -157,12 +155,12 @@ if(!is_numeric($url_id)) {
                 } elseif ($key == 'path') {
 
                     $categories = explode('_', $value);
-                    foreach ($categories as $category) {
 
-                        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "category a, " . DB_PREFIX . "category_description b WHERE a.category_id = " . $category . " AND a.category_id = b.category_id AND a.status = 1 AND b.language_id = " . (int)$this->config->get('config_language_id') . ";");
-                 
-$url .= "/" . $query->row['name'];
+                    foreach ($categories as $category) {
+                        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "category a, " . DB_PREFIX . "category_description b WHERE a.category_id = " . $category . " AND a.category_id = b.category_id AND status = 1 AND b.language_id = " . (int)$this->config->get('config_language_id') . ";");
+                        $url .= "/" . $this->escapeText($query->row['name']);
                     }
+
                     unset($data[$key]);
                 }
             }
@@ -189,8 +187,16 @@ $url .= "/" . $query->row['name'];
 		}
     }
 
-    public function transformName($name) {
-        return $name;
+    public function escapeText($name) {
+        $text = str_replace("/", "|", $name);
+	    $text = str_replace("&amp;", "(and)", $text);
+	    return $text;
+    }
+
+    public function unescapeText($name) {
+        $text = str_replace("|", '/', $name);
+	    $text = str_replace("(and)", "&amp;", $text);
+	    return $text;
     }
 
     public function old_rewrite($link) {
