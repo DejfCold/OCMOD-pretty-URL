@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modification>
+	<name>Autogenerate friendly url</name>
+	<code>autogenerate_friendly_url</code>
+	<version>1.0.0</version>
+	<author>David Studený</author>
+	<link>https://dejfcold.cz</link>
+    <file path="catalog/controller/startup/seo_url.php">
+		<operation error="skip">
+			<search><![CDATA[public function index() {]]></search>
+            <add position="replace"><![CDATA[public function index() {
+
+		// Add rewrite to url class
+		if ($this->config->get('config_seo_url')) {
+			$this->url->addRewrite($this);
+		}
+
+		// Decode URL
+		if (isset($this->request->get['_route_'])) {
+            $parts = explode('/', $this->request->get['_route_']);
+
+			// remove any empty arrays from trailing
+			if (utf8_strlen(end($parts)) == 0) {
+				array_pop($parts);
+			}
+
+            if(count($parts) == 1) {
+                $part = $parts[0];
+                $isProduct = $this->extractProduct($part);
+                if($isProduct) {
+                    return;
+                }
+
+                $isInformation = $this->extractInformation($part);
+                if($isInformation) {
+                    return;
+                }
+
+                $isManufacturer = $this->extractManufacturer($part);
+                if($isManufacturer) {
+                    return;
+                }
+            }
+
+            if($this->extractProduct($parts[count($parts)-1])) {
+return;
+}
+            $isCategory = $this->extractCategory($parts);
+            if($isCategory) {
+                return;
+            }
+            $this->request->get['route'] = 'error/not_found';
+        }
+    }
+
+    public function extractProduct($urlPart) {
+
+        $id_name = explode('-', $urlPart, 2);
+        $url_id = $id_name[0];
+        $url_name = $this->transformName($id_name[1]);
+
+if(!is_numeric($url_id)) {
+  return false;
+}
+        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product WHERE product_id = " . $this->db->escape($url_id) . ';');
+        if ($query->num_rows) {
+            $prod_id = $query->row['product_id'];
+            $prod_name = $this->transformName($query->row['model']);
+            if($url_name == $prod_name && $url_id == $prod_id) {
+                $this->request->get['product_id'] = $prod_id;
+                $this->request->get['route'] = 'product/product';
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function extractCategory($urlParts) {
+
+        $parentId = 0;
+        $path = "";
+        foreach($urlParts as $part) {
+
+            $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "category a, " . DB_PREFIX . "category_description b WHERE b.name = '" . $this->db->escape($part) . "' AND a.category_id = b.category_id AND a.parent_id = " . $parentId . " AND a.status = 1;");
+            if ($query->num_rows) {
+                $parentId = $query->row['category_id'];
+                if($path == "") {
+                    $path = $parentId;
+                } else {
+                    $path .= '_' . $parentId;
+                }
+
+            }
+        }
+        if($parentId != 0) {
+            $this->request->get['category_id'] = $parentId;
+            $this->request->get['path'] = $path;
+            $this->request->get['route'] = 'product/category';
+            return true;
+        }
+        return false;
+    }
+
+    public function extractInformation($urlPart) {
+        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "information_description a, " . DB_PREFIX . "information b WHERE a.information_id = b.information_id AND a.title = '" . $this->db->escape($urlPart) . "' AND b.status = 1;");
+        if ($query->num_rows) {
+            $this->request->get['information_id'] = $query->row['information_id'];
+            $this->request->get['route'] = 'information/information';
+            return true;
+        }
+        return false;
+    }
+
+    public function extractManufacturer($urlPart) {
+        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "manufacturer WHERE name = '" . $this->db->escape($urlPart) . "';");
+        if ($query->num_rows) {
+            $this->request->get['manufacturer_id'] = $query->row['manufacturer_id'];
+            $this->request->get['route'] = 'product/manufacturer/info';
+            return true;
+        }
+        return false;
+    }
+
+    public function old_index() {]]></add>
+    </operation>
+		<operation error="skip">
+			<search><![CDATA[public function rewrite($link) {]]></search>
+            <add position="replace"><![CDATA[public function rewrite($link) {
+		$url_info = parse_url(str_replace('&amp;', '&', $link));
+
+		$url = '';
+
+		$data = array();
+
+		parse_str($url_info['query'], $data);
+
+        foreach ($data as $key => $value) {
+            if(isset($data['route'])) {
+                if($data['route'] == 'product/product' && $key == 'product_id') {
+                    $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "product WHERE product_id = " . $this->db->escape($value) . ";");
+                    if ($query->num_rows) {
+                        $url .= "/" . $query->row['product_id'] . "-" . $this->transformName($query->row['model']);
+                        unset($data[$key]);
+                    }
+                } elseif ($data['route'] == 'product/manufacturer/info' && $key == 'manufacturer_id') {
+                    $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "manufacturer WHERE manufacturer_id = " . $this->db->escape($value) . ";");
+                    if ($query->num_rows) {
+                        $url .= "/" . $query->row['name'];
+                        unset($data[$key]);
+                    }
+                } elseif ($data['route'] == 'information/information' && $key == 'information_id') {
+                    $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "information a, " . DB_PREFIX . "information_description b WHERE b.language_id = '" . (int)$this->config->get('config_language_id') . "' AND b.information_id = a.information_id AND a.information_id = " . $this->db->escape($value) . ";");
+                    if ($query->num_rows) {
+                        $url .= "/" . $query->row['title'];
+                        unset($data[$key]);
+                    }
+                } elseif ($key == 'path') {
+
+                    $categories = explode('_', $value);
+                    foreach ($categories as $category) {
+
+                        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "category a, " . DB_PREFIX . "category_description b WHERE a.category_id = " . $category . " AND a.category_id = b.category_id AND a.status = 1 AND b.language_id = " . (int)$this->config->get('config_language_id') . ";");
+                 
+$url .= "/" . $query->row['name'];
+                    }
+                    unset($data[$key]);
+                }
+            }
+        }
+
+		if ($url) {
+			unset($data['route']);
+
+			$query = '';
+
+			if ($data) {
+				foreach ($data as $key => $value) {
+					$query .= '&' . rawurlencode((string)$key) . '=' . rawurlencode((is_array($value) ? http_build_query($value) : (string)$value));
+				}
+
+				if ($query) {
+					$query = '?' . str_replace('&', '&amp;', trim($query, '&'));
+				}
+			}
+
+			return $url_info['scheme'] . '://' . $url_info['host'] . (isset($url_info['port']) ? ':' . $url_info['port'] : '') . str_replace('/index.php', '', $url_info['path']) . $url . $query;
+		} else {
+			return $link;
+		}
+    }
+
+    public function transformName($name) {
+        return $name;
+    }
+
+    public function old_rewrite($link) {
+]]></add>
+    </operation>
+</file>
+
+</modification>
