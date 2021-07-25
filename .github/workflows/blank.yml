@@ -32,9 +32,7 @@ jobs:
       - name: Build ocmod package
         run: $GITHUB_WORKSPACE/build.sh
         
-      - name: Upload to release
-        uses: JasonEtco/upload-to-release@master
+      - uses: actions/upload-artifact@v2
         with:
-          args: autogenerate-friendly-url.ocmod.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: autogenerate-friendly-url
+          path: autogenerate-friendly-url.ocmod.zip
