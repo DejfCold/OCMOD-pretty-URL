@@ -57,7 +57,11 @@
     public function extractProduct($urlPart) {
         $id_name = explode('-', $urlPart, 2);
         $url_id = $id_name[0];
-        $url_name = $this->unescapeText($id_name[0]);
+        if(!array_key_exists(1, $id_name)){
+           return false;
+        }
+        $url_name = $this->unescapeText($id_name[1]);
+
         if(!is_numeric($url_id)) {
             return false;
         }
